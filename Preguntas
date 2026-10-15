@@ -4,6 +4,7 @@ Solo si incluís apuestas
 28. ¿Mantenemos los tres mercados —ganador, pole y vuelta rápida— y una apuesta por usuario en cada uno?
 29. ¿Confirmamos que se pueden modificar o retirar hasta el mismo cierre de los pronósticos y que, si nadie acierta un mercado, se devuelve lo apostado?
 30. Si se corrige un resultado después de pagar premios, ¿preferís permitir saldos negativos y bloquear nuevas apuestas hasta recuperarlos, o fijar una liquidación definitiva tras la cual las correcciones ya no cambien las apuestas? Esta decisión determina cómo tratar los premios ya gastados.
+Debería verificarse el resultado antes de pagar o esperar a que sea definitivo.
 31. Para repartir los puntos sobrantes por redondeo, ¿mantenemos que se los lleve el acertante que más apostó, con desempate por antigüedad? Si modifica su apuesta, ¿se toma la fecha de la última modificación?
 Organización y tecnología
 32. ¿Cuántos sois en el equipo y cuál es la fecha de entrega?
