@@ -1,0 +1,438 @@
+================================================================================
+PROPUESTA DE PROYECTO
+Practica de Desarrollo de Aplicaciones Web (G2105)
+
+PorraGP (nombre provisional)
+Porra de Formula 1 con pronosticos y apuestas por puntos
+================================================================================
+
+INDICE
+  1.  Resumen
+  2.  Por que esta idea
+  3.  Como funciona
+  4.  Reglas de negocio y casos limite
+  5.  Permisos
+  6.  Modelo de datos
+  7.  Flujo principal y video
+  8.  Accesibilidad, movil y experiencia de uso
+  9.  Pruebas automatizadas
+  10. Notas tecnicas
+  11. Fases de desarrollo
+  12. Decisiones pendientes
+
+
+1. RESUMEN
+--------------------------------------------------------------------------------
+
+PorraGP es una web para hacer una porra de Formula 1 entre todos sus usuarios,
+que compiten en una misma clasificacion.
+
+Antes de cada carrera, cada usuario pronostica quien hara la pole, quienes
+subiran al podio (en orden) y quien hara la vuelta rapida. Los pronosticos son
+secretos hasta la hora de salida: en ese momento se cierran y se destapan los
+de todos. Cuando el administrador mete el resultado oficial, la aplicacion
+calcula los puntos de cada usuario y actualiza la clasificacion.
+
+En una segunda fase se añaden apuestas con puntos (nunca dinero real): cada
+usuario puede arriesgar parte de su saldo en cada carrera. Si acierta gana mas,
+y si falla pierde lo apostado.
+
+
+2. POR QUE ESTA IDEA
+--------------------------------------------------------------------------------
+
+- Reglas de negocio de serie. El cierre a la hora de salida, la puntuacion, el
+  comodin y los saldos son reglas claras que salen solas del tema, y el PDF
+  evalua justo eso, tanto en la aplicacion como en las pruebas. En otras ideas,
+  como una web de reseñas de pelis y series (que ademas es uno de los ejemplos
+  del PDF y seguramente la cojan varios grupos), las reglas hay que inventarlas.
+
+- Contenido privado que luego se hace publico. El pronostico de cada uno es
+  secreto hasta la salida, lo que cubre de forma natural el requisito de que
+  un usuario no pueda consultar el contenido de otro.
+
+- Encaja con no usar WebSockets. El destape y la clasificacion se actualizan
+  con polling (peticiones periodicas al servidor), y aqui no hace falta tiempo
+  real estricto.
+
+- Casos limite faciles de definir y de probar: pronosticar un segundo antes o
+  despues de la salida, apostar mas de lo que tienes, repartos con redondeo...
+
+- Flujo principal corto y vistoso para el video: pronosticas, se cierra, se
+  destapa, se mete el resultado y cambia la clasificacion.
+
+- Alcance controlado. La version minima ya cumple todos los requisitos, y las
+  apuestas se añaden encima sin rehacer nada.
+
+- Identidad propia. No es uno de los ejemplos del PDF, asi que es dificil que
+  coincida con otro grupo.
+
+
+3. COMO FUNCIONA
+--------------------------------------------------------------------------------
+
+3.1 Usuarios y roles
+
+  - Visitante (sin sesion): ve la portada y puede registrarse o iniciar sesion.
+  - Usuario registrado: pronostica, apuesta (fase 2) y consulta resultados,
+    clasificacion y perfiles.
+  - Administrador: gestiona campeonato, pilotos, carreras y resultados. Se crea
+    con el script de datos iniciales (seed); no hay registro de
+    administradores.
+
+  Cada usuario tiene un perfil con su nombre, su piloto favorito, su posicion y
+  sus puntos en la clasificacion, su porcentaje de aciertos y el historial de
+  sus pronosticos con los puntos de cada carrera (en la fase 2, tambien su
+  saldo y sus apuestas). Se pueden ver los perfiles de otros usuarios, pero
+  solo con las carreras ya cerradas.
+
+3.2 Calendario
+
+  El administrador da de alta el campeonato (por ejemplo, "Formula 1 2026"),
+  los pilotos inscritos con su equipo y dorsal, y las carreras (ronda, nombre
+  del Gran Premio, circuito, y fecha y hora de salida). Para no meterlo todo a
+  mano, un seed carga la temporada completa.
+
+3.3 Pronosticos y puntuacion
+
+  En cada carrera, cada usuario hace un unico pronostico con:
+    - Pole.
+    - Podio: primero, segundo y tercero.
+    - Vuelta rapida.
+    - Comodin (opcional): duplica los puntos de esa carrera. Solo uno por
+      temporada.
+
+  Puntuacion propuesta (a ajustar entre todos):
+    - Pole acertada: 5 puntos.
+    - Cada piloto del podio en su posicion exacta: 10 puntos.
+    - Cada piloto del podio acertado pero en otra posicion: 3 puntos.
+    - Vuelta rapida acertada: 5 puntos.
+    - Comodin: x2 en esa carrera.
+  Maximo por carrera: 40 puntos (80 con el comodin).
+
+3.4 Privado hasta la salida, despues en comun
+
+  Cada carrera pasa por estas fases:
+
+    - Abierta (hasta la hora de salida): cada usuario puede crear, cambiar o
+      borrar su pronostico. Solo ve el suyo; de los demas solo ve cuantos han
+      pronosticado (por ejemplo, "12 usuarios han pronosticado"), no el que.
+    - Cerrada (desde la hora de salida): ya no se puede cambiar nada y se
+      destapan los pronosticos y apuestas de todos.
+    - Finalizada (cuando el admin mete el resultado): se calculan los puntos,
+      se ven los aciertos de cada uno y se actualiza la clasificacion.
+    - Cancelada (si el admin cancela la carrera): los pronosticos no puntuan y
+      las apuestas se devuelven.
+
+  Por que asi: nadie puede copiar el pronostico de otro, nadie puede esperar al
+  ultimo segundo a ver como van las apuestas, y el destape le da gracia al
+  juego.
+
+  Importante: el filtro lo hace el servidor, no la interfaz. Si un usuario pide
+  los pronosticos de una carrera abierta, la API solo le devuelve el suyo,
+  aunque la peticion no venga de la web.
+
+  Las paginas de carrera y de clasificacion hacen polling (por ejemplo, cada 20
+  segundos) para pasar solas de una fase a otra y mostrar los cambios.
+
+3.5 Apuestas (fase 2)
+
+  - Al empezar la temporada cada usuario tiene un saldo inicial (propuesta:
+    1000 puntos). Los puntos del pronostico se suman al saldo y las apuestas
+    lo mueven. La clasificacion pasa a ser el saldo.
+  - Son puntos ficticios: no se compran ni se canjean por nada.
+  - En cada carrera hay tres mercados: ganador, pole y vuelta rapida. En cada
+    uno, el usuario puede apostar una cantidad de puntos a un piloto.
+  - Funcionan como apuesta de pozo: todo lo apostado en un mercado va a un
+    bote comun, y los que aciertan se lo reparten en proporcion a lo que
+    apostaron. Asi no hay que inventarse cuotas: salen solas de lo que apuesta
+    la gente. Si casi todos apuestan al favorito y gana, se paga poco; si gana
+    un piloto al que casi nadie aposto, se paga mucho.
+
+  Ejemplo con el mercado "ganador" de una carrera:
+
+      Ana apuesta 200 a Verstappen
+      Bea apuesta 100 a Verstappen
+      Carlos apuesta 150 a Norris
+      Dani apuesta 50 a Leclerc
+      Bote: 500 puntos
+
+    - Si gana Leclerc, Dani se lleva los 500 (diez veces lo que aposto).
+    - Si gana Verstappen, Ana y Bea se reparten el bote en proporcion a lo que
+      apostaron (2 a 1): Ana 333 y Bea 166. Sobra 1 punto por redondeo, que va
+      para Ana por ser la que mas aposto. Carlos y Dani pierden lo suyo.
+    - Si gana un piloto al que nadie aposto, se devuelve a cada uno lo suyo.
+
+
+4. REGLAS DE NEGOCIO Y CASOS LIMITE
+--------------------------------------------------------------------------------
+
+Pronosticos:
+  - Un pronostico por usuario y carrera.
+  - Solo se puede crear, cambiar o borrar mientras la carrera esta abierta. A
+    la hora exacta de salida ya cuenta como cerrada.
+  - Los tres pilotos del podio tienen que ser distintos.
+  - Todos los pilotos elegidos tienen que estar inscritos en el campeonato de
+    esa carrera.
+  - Hay que rellenarlo entero: pole, los tres puestos del podio y vuelta
+    rapida.
+  - El comodin se puede usar una vez por temporada. Si se borra el pronostico
+    antes del cierre, o si la carrera se cancela, el comodin se recupera.
+  - Si el admin corrige un resultado (por ejemplo, por una descalificacion
+    despues de la carrera), los puntos se recalculan.
+
+Apuestas (fase 2):
+  - El importe es un numero entero mayor que 0.
+  - No se puede apostar mas que el saldo disponible ni pasar del tope por
+    carrera (propuesta: 300 puntos sumando los tres mercados).
+  - Una apuesta por usuario, carrera y mercado. Se puede cambiar o retirar
+    hasta la salida; al cambiarla se devuelve la anterior y se cobra la nueva
+    en la misma operacion.
+  - Si nadie acierta en un mercado, se devuelve a cada uno lo suyo.
+  - Si se cancela la carrera, se devuelven todas las apuestas.
+  - Los repartos son en numeros enteros. Los puntos que sobran por redondeo
+    van al que mas aposto (si hay empate, al que aposto antes).
+  - En cada mercado se reparte exactamente lo apostado, ni un punto mas ni
+    menos.
+  - Si se corrige un resultado, se deshace el reparto y se vuelve a hacer.
+    Repartir dos veces la misma carrera no paga dos veces.
+  - Nadie puede cambiar un saldo a mano, ni el admin. Todo cambio de saldo
+    queda registrado como un movimiento con su motivo, y el saldo tiene que
+    coincidir siempre con la suma de sus movimientos.
+  - Quien se queda a 0 sigue pronosticando, y con esos puntos puede volver a
+    apostar.
+
+Tras cualquier operacion rechazada, los datos tienen que quedar exactamente
+como estaban (por ejemplo, una apuesta rechazada no toca el saldo).
+
+
+5. PERMISOS
+--------------------------------------------------------------------------------
+
+Todos se comprueban en el servidor; ocultar botones en la interfaz no basta.
+
+  1. Autenticacion: sin sesion solo se puede ver la portada, registrarse e
+     iniciar sesion. Todo lo demas responde 401.
+  2. Propiedad: un pronostico o una apuesta solo los puede cambiar o borrar
+     su autor. Cualquier otro usuario recibe 403.
+  3. Rol de administrador: solo el admin gestiona campeonato, pilotos,
+     carreras y resultados. Un usuario normal recibe 403.
+  4. Visibilidad por tiempo: los pronosticos y apuestas de otros no se pueden
+     consultar hasta la hora de salida. Antes, el listado solo trae los tuyos
+     y pedir uno ajeno por su id da 404.
+
+
+6. MODELO DE DATOS
+--------------------------------------------------------------------------------
+
+Version minima:
+
+  USUARIO      id, nombre de usuario, email, contraseña (hash), rol (usuario o
+               admin), piloto favorito, fecha de alta.
+  CAMPEONATO   id, nombre (por ejemplo, "Formula 1 2026"), temporada.
+  PILOTO       id, nombre, nacionalidad.
+  INSCRIPCION  campeonato, piloto, equipo, dorsal. Un piloto se inscribe una
+               sola vez por campeonato y el dorsal no se repite dentro del
+               campeonato.
+  CARRERA      id, campeonato, ronda, nombre del Gran Premio, circuito, fecha
+               y hora de salida, cancelada (si/no).
+  RESULTADO    carrera, pole, primero, segundo, tercero, vuelta rapida. Uno
+               por carrera; todos los pilotos tienen que estar inscritos.
+  PRONOSTICO   id, usuario, carrera, pole, primero, segundo, tercero, vuelta
+               rapida, comodin (si/no), puntos obtenidos. Uno por usuario y
+               carrera.
+
+Fase 2:
+
+  APUESTA      id, usuario, carrera, mercado (ganador, pole o vuelta rapida),
+               piloto elegido, importe, premio. Una por usuario, carrera y
+               mercado.
+  MOVIMIENTO   id, usuario, tipo (saldo inicial, puntos de pronostico,
+               apuesta, premio, devolucion o correccion), importe (positivo o
+               negativo), carrera o apuesta relacionada, fecha.
+
+Relaciones principales:
+  - Un campeonato tiene muchas carreras y muchos pilotos inscritos.
+  - Una carrera tiene un resultado y muchos pronosticos (y apuestas).
+  - Un usuario tiene un pronostico por carrera, y sus apuestas y movimientos.
+  - Pronosticos, resultados y apuestas apuntan a pilotos inscritos en el
+    campeonato de su carrera.
+
+
+7. FLUJO PRINCIPAL Y VIDEO
+--------------------------------------------------------------------------------
+
+  1. Ana se registra e inicia sesion.
+  2. En el calendario ve la proxima carrera abierta y cuanto falta para la
+     salida.
+  3. Hace su pronostico y, si quiere, usa el comodin. En la fase 2, ademas,
+     apuesta en uno o varios mercados.
+  4. Puede cambiarlo hasta la salida. Ve cuantos usuarios han pronosticado,
+     pero no que han puesto.
+  5. A la hora de salida la carrera se cierra y se destapan los pronosticos
+     de todos.
+  6. Tras la carrera, el admin mete el resultado oficial.
+  7. Se calculan los puntos (y se reparten los botes) y se actualizan la
+     clasificacion y los perfiles.
+
+Para el video: este recorrido completo, mas algun error bien tratado
+(cambiar un pronostico despues de la salida, un podio con un piloto repetido
+o una apuesta mayor que el saldo). Para grabarlo sin esperar a una carrera
+real, se crea una carrera de prueba con la salida a los pocos minutos.
+
+
+8. ACCESIBILIDAD, MOVIL Y EXPERIENCIA DE USO
+--------------------------------------------------------------------------------
+
+Referencia: WCAG 2.2 nivel AA, como recomienda el PDF.
+
+  - HTML semantico, idioma de la pagina en español y encabezados ordenados.
+  - Formularios de pronostico y apuesta con etiqueta en todos los campos y
+    errores claros junto al campo que falla.
+  - Todo usable con teclado, con foco visible y en un orden logico.
+  - Los cambios importantes (pronostico guardado, error, carrera cerrada,
+    destape, resultados) se anuncian tambien a lectores de pantalla
+    (regiones aria-live). La cuenta atras no se anuncia cada segundo, solo
+    en momentos clave.
+  - Aciertos y fallos con icono y texto, no solo con verde y rojo.
+  - Contraste suficiente entre texto y fondo.
+  - La clasificacion es una tabla de verdad en escritorio, y en movil se
+    adapta (menos columnas o tarjetas) sin desplazamiento horizontal de la
+    pagina.
+  - Botones con tamaño y separacion comodos para usar con el dedo.
+  - Confirmacion antes de acciones destructivas: borrar un pronostico,
+    retirar una apuesta o cancelar una carrera.
+  - Estados vacios explicitos ("Todavia no has pronosticado esta carrera",
+    "No hay carreras abiertas"), indicador de carga en las peticiones y
+    mensajes de exito y de error visibles. La interfaz no da por hecho que
+    las peticiones salen bien.
+  - Se revisa con teclado, con una herramienta automatica (Lighthouse o axe)
+    y en vista de escritorio y de movil.
+
+
+9. PRUEBAS AUTOMATIZADAS
+--------------------------------------------------------------------------------
+
+Pruebas de API: peticiones HTTP al servidor comprobando el codigo de
+respuesta, lo que devuelve y como quedan los datos.
+
+Condiciones que pide el PDF:
+  - Se lanzan con un unico comando (por ejemplo, npm test), documentado en el
+    README.
+  - Base de datos de pruebas aparte, nunca la de desarrollo.
+  - Cada prueba prepara sus propios datos y no depende del orden.
+  - Tras cada caso de error se comprueba que los datos no han cambiado.
+  Ademas, la hora del servidor se puede fijar en las pruebas (ver notas
+  tecnicas) para probar el cierre sin esperar.
+
+Casos minimos:
+
+  Autenticacion
+    - Crear, cambiar o borrar un pronostico sin sesion: 401 y no cambia nada.
+
+  Autorizacion (un caso por cada tipo de permiso)
+    - B intenta cambiar o borrar el pronostico de A: 403 y el de A sigue
+      igual.
+    - Un usuario normal intenta crear una carrera o meter un resultado: 403.
+    - Con la carrera abierta, B pide los pronosticos y solo recibe el suyo;
+      si pide el de A por su id, 404. Con la carrera cerrada, los ve todos.
+
+  CRUD
+    - Crear, consultar, cambiar y borrar un pronostico antes del cierre,
+      comprobando la base de datos en cada paso.
+    - Crear, consultar, cambiar y borrar pilotos y carreras como admin.
+
+  Validacion
+    - Podio con un piloto repetido: 400.
+    - Piloto no inscrito en el campeonato: 400.
+    - Pronostico incompleto: 400.
+    - Apuesta con importe 0, negativo o con decimales: 400.
+
+  Reglas de negocio y casos limite
+    - Pronostico un segundo antes de la salida: se acepta. A la hora exacta:
+      409.
+    - Segundo comodin en la misma temporada: 409. Borrar el pronostico antes
+      del cierre devuelve el comodin.
+    - Un pronostico con aciertos conocidos da exactamente los puntos que
+      tocan.
+    - Al corregir un resultado, los puntos se recalculan.
+    - Apuesta mayor que el saldo o por encima del tope: 409 y el saldo no
+      cambia.
+    - Reparto del bote proporcional, con el redondeo correcto y la suma
+      pagada igual a la suma apostada.
+    - Si nadie acierta o la carrera se cancela, se devuelve todo.
+    - Repartir dos veces la misma carrera no paga doble.
+    - El saldo coincide con la suma de movimientos.
+    - Dos apuestas a la vez que juntas superan el saldo: solo pasa una.
+
+  Flujo principal
+    - Dos usuarios pronostican y apuestan, llega la hora de salida, se
+      destapa todo, el admin mete el resultado y la clasificacion queda como
+      debe.
+
+
+10. NOTAS TECNICAS
+--------------------------------------------------------------------------------
+
+  - El cierre no necesita ningun proceso programado. El servidor calcula el
+    estado de la carrera en cada peticion: si esta cancelada, cancelada; si
+    tiene resultado, finalizada; si la hora actual es igual o posterior a la
+    de salida, cerrada; si no, abierta.
+  - Reloj inyectable: el servidor obtiene la hora actual de una unica funcion
+    que en las pruebas se puede fijar. Asi se prueba "un segundo antes" y "a
+    la hora exacta" sin esperar.
+  - Polling en vez de WebSockets: las paginas de carrera y clasificacion
+    preguntan al servidor cada pocos segundos si hay cambios.
+  - Saldo seguro: el descuento de una apuesta se hace con una operacion
+    atomica (comprobar el saldo y restarlo en la misma sentencia, dentro de
+    una transaccion). Si no, dos apuestas simultaneas podrian dejar el saldo
+    en negativo.
+  - Reparto idempotente: repetirlo no cambia nada, y corregir un resultado es
+    deshacer el reparto anterior y hacer el nuevo.
+  - Datos iniciales con un seed: temporada, pilotos, carreras y un admin de
+    prueba. Las credenciales de prueba van en el README, nunca contraseñas
+    reales.
+  - Secretos (como la clave de sesion) en un .env fuera del repositorio, con
+    un .env.example de plantilla.
+  - Codigos de respuesta comunes para todo el equipo:
+      400  datos invalidos o incompletos
+      401  sin sesion
+      403  sin permiso
+      404  no existe o no se puede ver
+      409  no permitido en el estado actual (carrera cerrada, comodin ya
+           usado, saldo insuficiente)
+
+
+11. FASES DE DESARROLLO
+--------------------------------------------------------------------------------
+
+Fase 1. Version minima (prioridad)
+  - Registro, inicio de sesion y perfil.
+  - Gestion de campeonato, pilotos, carreras y resultados por el admin.
+  - Pronosticos con cierre a la hora de salida y destape.
+  - Puntuacion, comodin y clasificacion.
+  - Validacion en cliente y servidor, y errores claros.
+  - Accesibilidad y diseño adaptable.
+  - Pruebas de API de todo lo anterior.
+  - README con instrucciones de instalacion y ejecucion y una descripcion
+    breve de la arquitectura.
+  Con esto la practica ya cumple todos los requisitos.
+
+Fase 2. Apuestas
+  - Saldo, mercados, botes y movimientos.
+  - Repartos, devoluciones y correccion de resultados.
+  - Pruebas de todas las reglas de saldo.
+
+
+12. DECISIONES PENDIENTES
+--------------------------------------------------------------------------------
+
+  - Tecnologias: lenguaje y framework del servidor, y base de datos. El PDF
+    obliga a usar JavaScript (sin WebAssembly), comunicar cliente y servidor
+    por HTTP sin WebSockets y poder probar el servidor por HTTP.
+  - Reparto del trabajo.
+  - Valores finales de puntuacion, saldo inicial y tope de apuesta (los de
+    este documento son una propuesta).
+  - Que temporada usar para desarrollar y para la demo. Como los datos se
+    cargan con un seed, no tiene por que ser la temporada en curso.
+  - Nombre definitivo.
