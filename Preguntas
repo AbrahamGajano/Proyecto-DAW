@@ -1,14 +1,146 @@
-Solo si incluís apuestas
-26. ¿Confirmamos 1.000 puntos iniciales por usuario y temporada y un máximo de 300 apostados por carrera entre todos los mercados?
-27. ¿El saldo de apuestas será independiente de la clasificación de pronósticos? ¿Los puntos ganados pronosticando también aumentarán ese saldo?
-28. ¿Mantenemos los tres mercados —ganador, pole y vuelta rápida— y una apuesta por usuario en cada uno?
-29. ¿Confirmamos que se pueden modificar o retirar hasta el mismo cierre de los pronósticos y que, si nadie acierta un mercado, se devuelve lo apostado?
-30. Si se corrige un resultado después de pagar premios, ¿preferís permitir saldos negativos y bloquear nuevas apuestas hasta recuperarlos, o fijar una liquidación definitiva tras la cual las correcciones ya no cambien las apuestas? Esta decisión determina cómo tratar los premios ya gastados.
-Debería verificarse el resultado antes de pagar o esperar a que sea definitivo.
-31. Para repartir los puntos sobrantes por redondeo, ¿mantenemos que se los lleve el acertante que más apostó, con desempate por antigüedad? Si modifica su apuesta, ¿se toma la fecha de la última modificación?
-Organización y tecnología
-32. ¿Cuántos sois en el equipo y cuál es la fecha de entrega?
-somos 4, no hay fecha
-33. ¿Qué tecnologías conocéis y cuáles os ha autorizado o recomendado el profesor?
-34. ¿La aplicación debe funcionar solo en local para la demostración o también queréis publicarla en Internet?
+**1. ¿La primera versión incluirá solo pronósticos o también apuestas con puntos ficticios?**
+
+La primera versión incluirá únicamente pronósticos y su puntuación. Las apuestas con puntos ficticios se plantearán como una ampliación.
+
+**2. ¿Todos los usuarios competirán en una clasificación común o podrán crear grupos privados con sus amigos?**
+
+Habrá una clasificación global y también grupos privados de amigos.
+
+**3. ¿Cualquiera podrá registrarse o será necesario recibir una invitación?**
+
+Cualquiera podrá registrarse en la aplicación. Para acceder a los grupos privados será necesaria una invitación.
+
+**4. ¿Se podrá entrar a competir con la temporada empezada? ¿Con cuántos puntos se empezará?**
+
+Sí. Los usuarios que se incorporen con la temporada empezada comenzarán con cero puntos.
+
+**5. ¿Se gestionará una única temporada o se conservarán las anteriores?**
+
+Se conservarán las temporadas anteriores y sus clasificaciones de una manera sencilla.
+
+**6. ¿Qué predicciones incluirá cada pronóstico?**
+
+Cada pronóstico incluirá cinco predicciones: ganador de la clasificación, primero, segundo y tercero de la carrera, y piloto que consiga la vuelta rápida.
+
+**7. ¿Será obligatorio rellenar las cinco predicciones?**
+
+Sí. Será necesario completar las cinco para guardar el pronóstico.
+
+**8. ¿Qué puntuación se utilizará?**
+
+Se mantendrá la siguiente puntuación:
+
+- Ganador de la clasificación acertado: 5 puntos.
+- Cada piloto del podio en su posición exacta: 10 puntos.
+- Cada piloto acertado dentro del podio, pero en otra posición: 3 puntos.
+- Vuelta rápida acertada: 5 puntos.
+
+Los 10 puntos por posición exacta y los 3 por posición incorrecta no se acumulan para un mismo piloto.
+
+**9. ¿Se mantendrá el comodín que duplica los puntos de una carrera?**
+
+Sí. Cada usuario dispondrá de un comodín por temporada que duplicará los puntos obtenidos en una carrera.
+
+**10. ¿Se podrá retirar o cambiar el comodín a otra carrera antes del cierre?**
+
+No. Una vez canjeado, el comodín se considera consumido y no se puede trasladar a otra carrera.
+
+**11. ¿Cómo se resolverán los empates en la clasificación?**
+
+Los usuarios con la misma puntuación compartirán posición.
+
+**12. ¿Se mostrará un porcentaje de aciertos?**
+
+No. No es necesario incluir esa estadística.
+
+**13. ¿Cuándo se harán visibles los pronósticos de los demás usuarios?**
+
+Cuando haya terminado toda la carrera. No se revelarán al cerrar el plazo de participación.
+
+**14. Si se retrasa la clasificación, ¿se mantendrá el cierre originalmente fijado?**
+
+Sí. Se mantendrá la fecha y hora de cierre originalmente establecida.
+
+**15. Si se cancela una carrera, ¿se anularán sus puntos y se devolverá el comodín, aunque la clasificación ya se haya disputado?**
+
+Se cancelará todo lo correspondiente a esa carrera.
+
+**16. ¿Qué ocurrirá si un piloto elegido no participa finalmente?**
+
+Las predicciones correspondientes a ese piloto obtendrán cero puntos, sin sustitución automática.
+
+**17. ¿Se incluirán las carreras sprint?**
+
+No. Las carreras sprint quedarán fuera del proyecto.
+
+**18. Para la predicción de la pole, ¿se tomará al ganador de la clasificación o al piloto que finalmente ocupe la primera posición de salida?**
+
+Se tomará al ganador de la sesión de clasificación.
+
+**19. ¿El administrador introducirá manualmente pilotos, horarios y resultados? ¿Habrá datos de ejemplo cargados?**
+
+Sí. El administrador podrá introducir los datos manualmente y habrá datos iniciales de ejemplo cargados.
+
+**20. ¿Se podrán corregir resultados ya publicados?**
+
+Sí. Se podrán corregir y se recalcularán los puntos de los pronósticos afectados.
+
+**21. ¿Solo se podrán borrar carreras o pilotos sin datos relacionados? ¿Las carreras con pronósticos se cancelarán en lugar de borrarse?**
+
+Sí. Solo se podrán borrar cuando no tengan datos relacionados. Las carreras que ya tengan pronósticos se cancelarán en lugar de eliminarse.
+
+**22. ¿El administrador podrá participar en la porra?**
+
+No. El administrador se dedicará exclusivamente a gestionar la aplicación.
+
+**23. ¿Qué información mostrará el perfil público de cada usuario?**
+
+El nombre de usuario, los puntos, la posición en la clasificación y el piloto favorito.
+
+**24. ¿Qué podrán ver los visitantes sin cuenta?**
+
+Solo la portada y el registro.
+
+**25. ¿El usuario podrá cambiar su nombre, piloto favorito y contraseña? ¿Habrá recuperación de contraseña por correo?**
+
+Sí. Podrá modificar esos datos y también deberá existir una función de recuperación de contraseña por correo.
+
+**26. Si se incorporan las apuestas, ¿cuál será el saldo inicial y el máximo que se podrá apostar por carrera?**
+
+Cada usuario recibirá 1.000 puntos de saldo inicial por temporada. El máximo será de 300 puntos apostados por carrera, sumando los tres mercados.
+
+**27. ¿El saldo de apuestas será independiente de los puntos de la clasificación de pronósticos?**
+
+Sí. Los puntos de la clasificación y el saldo de apuestas serán independientes.
+
+¿Los puntos obtenidos mediante pronósticos también se añadirán al saldo disponible para apostar?
+
+
+
+**28. ¿Qué mercados de apuestas habrá y cuántas apuestas podrá realizar cada usuario?**
+
+Habrá tres mercados: ganador de la carrera, ganador de la clasificación y vuelta rápida. Cada usuario podrá realizar una apuesta por carrera en cada mercado.
+
+**29. ¿Se podrán modificar o retirar las apuestas hasta el mismo cierre de los pronósticos? Si nadie acierta un mercado, ¿se devolverá lo apostado?**
+
+
+
+**30. Si se corrige un resultado después de pagar los premios, ¿se permitirán saldos negativos, bloqueando nuevas apuestas hasta recuperarlos, o se establecerá una liquidación definitiva tras la cual las correcciones no modificarán las apuestas?**
+
+
+
+**31. ¿Los puntos sobrantes por redondeo se entregarán al acertante que más haya apostado, con desempate por antigüedad? Si modifica su apuesta, ¿se utilizará la fecha de la última modificación?**
+
+
+
+**32. ¿Cuántas personas forman el equipo y cuál es la fecha de entrega?**
+
+
+
+**33. ¿Qué tecnologías conoce el equipo y cuáles ha autorizado o recomendado el profesor?**
+
+
+
+**34. ¿La aplicación deberá funcionar únicamente en local para la demostración o también se publicará en Internet?**
+
 
