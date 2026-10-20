@@ -1,0 +1,662 @@
+================================================================================
+PROPUESTA DE PROYECTO
+Practica de Desarrollo de Aplicaciones Web (G2105)
+
+PorraGP (nombre provisional)
+Porra de Formula 1 con apuestas por puntos
+
+Version 2 - 20 de octubre de 2026
+================================================================================
+
+INDICE
+  1.  Resumen
+  2.  Por que esta idea
+  3.  Como funciona
+  4.  Reglas de negocio y casos limite
+  5.  Permisos
+  6.  Modelo de datos
+  7.  Flujo principal y video
+  8.  Accesibilidad, movil y experiencia de uso
+  9.  Logs
+  10. Pruebas automatizadas
+  11. Notas tecnicas
+  12. Fases de desarrollo
+  13. Decisiones pendientes
+
+
+1. RESUMEN
+--------------------------------------------------------------------------------
+
+PorraGP es una web para hacer una porra de Formula 1 en la que se apuestan
+puntos, nunca dinero real. Todos los usuarios compiten en una clasificacion
+por temporada, y en una segunda fase podran crear grupos privados con sus
+amigos.
+
+Antes de cada carrera, cada usuario hace su jugada: elige a que quiere
+apostar (pole, primero, segundo, tercero o vuelta rapida), por que piloto y
+cuantos puntos. No hace falta apostar a las cinco cosas, pero si al menos a
+una. Si acierta, cobra el doble de lo apostado; si falla, lo pierde. Se
+apuesta con los puntos de la propia clasificacion, y quien tiene menos de
+100 puede apostar 100 igualmente.
+
+Las apuestas se cierran al empezar la qualy. Hasta que el administrador
+publica el resultado, nadie ve a que han apostado los demas. Al publicarlo,
+la aplicacion paga las apuestas acertadas y actualiza la clasificacion.
+
+Vocabulario usado en este documento:
+  - Qualy: la sesion de clasificacion del Gran Premio, la que decide la pole.
+  - Clasificacion: la tabla de puntos de los usuarios de la porra.
+  - Jugada: las apuestas de un usuario en una carrera.
+  - Categoria: cada cosa a la que se puede apostar: pole, primero, segundo,
+    tercero y vuelta rapida.
+
+
+2. POR QUE ESTA IDEA
+--------------------------------------------------------------------------------
+
+- Reglas de negocio de serie. El cierre a la hora de la qualy, la apuesta
+  minima, el minimo de 100 puntos, los pagos y el comodin salen solos del
+  tema, y el PDF evalua justo eso, tanto en la aplicacion como en las
+  pruebas, incluidos los casos limite.
+
+- Contenido privado que luego se hace publico. Lo que apuesta cada uno es
+  secreto hasta el resultado, lo que cubre de forma natural el requisito de
+  que un usuario no pueda consultar el contenido de otro.
+
+- Encaja con no usar WebSockets. Los cambios se ven con polling (peticiones
+  periodicas al servidor), porque aqui no hace falta tiempo real estricto.
+
+- Casos limite claros y faciles de probar: jugar un segundo antes o justo a
+  la hora del cierre, apostar mas puntos de los que tienes, el minimo de
+  100, cancelar una carrera ya cerrada o corregir un resultado.
+
+- Flujo principal corto y vistoso para el video: apuestas, se cierra, se
+  publica el resultado y cambia la clasificacion.
+
+- Identidad propia. No es uno de los ejemplos del PDF, asi que es dificil
+  que coincida con otro grupo.
+
+
+3. COMO FUNCIONA
+--------------------------------------------------------------------------------
+
+3.1 Usuarios y roles
+
+  - Visitante (sin sesion): solo ve la portada, el registro y el inicio de
+    sesion.
+  - Usuario: cualquiera puede registrarse. Juega las carreras y consulta
+    resultados, la clasificacion y los perfiles de los demas.
+  - Administrador: gestiona temporadas, pilotos, carreras y resultados. No
+    juega ni aparece en la clasificacion. Se crea con los datos iniciales
+    (seed); no hay registro de administradores.
+
+  Perfil de cada usuario:
+    - Publico: nombre de usuario, puntos, posicion en la clasificacion y
+      piloto favorito.
+    - Privado: su historial de jugadas, con el resultado de cada apuesta y
+      los puntos ganados o perdidos en cada carrera.
+    - Puede cambiar su nombre de usuario, su piloto favorito y su
+      contraseña (pidiendo la actual).
+
+3.2 Temporadas, pilotos y carreras
+
+  - Todo va por temporada: pilotos inscritos, carreras, puntos,
+    clasificacion y comodin. Las temporadas anteriores se conservan con su
+    clasificacion y se pueden consultar.
+  - En cada temporada, el admin inscribe a los pilotos con su equipo y su
+    dorsal. Si un piloto deja de correr (por ejemplo, porque lo sustituyen),
+    se marca como inactivo: deja de salir para apostar, pero se conserva su
+    historial. Al sustituto hay que inscribirlo antes del cierre para que se
+    pueda apostar por el y meterlo en el resultado.
+  - De cada carrera se guarda la ronda, el nombre del Gran Premio, el
+    circuito, la hora de inicio de la qualy (que es el cierre de las
+    apuestas) y la hora de salida de la carrera (solo informativa).
+  - Las carreras sprint no entran en la porra.
+  - El admin mete los datos a mano, y desde el principio habra datos de
+    ejemplo cargados (seed).
+
+3.3 La jugada
+
+  En cada carrera, cada usuario puede hacer una jugada con una apuesta como
+  maximo en cada categoria:
+    - Pole: el ganador de la qualy del Gran Premio (no la de la sprint, ni
+      quien salga primero tras las sanciones).
+    - Primero, segundo y tercero de la carrera.
+    - Vuelta rapida de la carrera.
+
+  Cada apuesta es un piloto y una cantidad de puntos:
+    - Minimo 10 puntos por apuesta, en numeros enteros.
+    - La jugada tiene que tener al menos una apuesta; no hace falta apostar
+      en las cinco categorias.
+    - En el podio no se puede repetir piloto: no puedes apostar el mismo
+      piloto a primero y a segundo. En pole y vuelta rapida si se puede
+      repetir un piloto del podio.
+    - Solo se pueden elegir pilotos inscritos y activos en la temporada.
+    - En total no se pueden apostar mas puntos de los disponibles (ver 3.4).
+
+  La jugada se puede crear, cambiar y borrar hasta el cierre, salvo lo que
+  se explica del comodin en 3.5. Quien no juega una carrera no gana ni
+  pierde nada en ella.
+
+  Pagos (de momento, iguales para todo):
+    - Apuesta acertada: se cobra el doble de lo apostado (x2), es decir, se
+      gana lo mismo que se aposto.
+    - Apuesta fallada: se pierde lo apostado.
+    - El multiplicador no depende del piloto ni de la categoria.
+    - Plus de podio: si se apuesta a primero, segundo y tercero y se aciertan
+      los tres, esas tres apuestas cobran el triple (x3) en vez del doble.
+    - Si un piloto por el que se ha apostado no llega a participar, la
+      apuesta cuenta como fallada. No hay sustitucion automatica.
+
+3.4 Puntos y minimo de 100
+
+  - Los puntos de la clasificacion son los mismos con los que se apuesta. No
+    hay un saldo aparte.
+  - Todos empiezan cada temporada con 0 puntos, tambien quien se une con la
+    temporada empezada.
+  - Puntos disponibles para una jugada: los que tengas, o 100 si tienes
+    menos de 100.
+  - Lo apostado se descuenta de la clasificacion al cerrarse las apuestas,
+    antes de que haya resultado. Desde ese momento ya no se puede cambiar
+    nada, asi que no importa que se note cuanto ha apostado cada uno; lo que
+    no se ve hasta el resultado es a que ha apostado.
+  - Minimo de 100: al cerrarse las apuestas, a quien ha jugado esa carrera y
+    tiene menos de 100 puntos se le suben a 100, y despues se descuenta lo
+    apostado. Crea puntos de la nada a proposito: asi nadie se queda sin
+    poder jugar y siempre se puede remontar.
+  - Al publicar el resultado se suman los cobros de las apuestas acertadas.
+  - Solo se puede jugar la proxima carrera, y se abre cuando la anterior ya
+    tiene resultado (o se ha cancelado). Asi el minimo de 100 siempre se
+    calcula con los puntos ya pagados: nadie puede quedarse a 0 apostandolo
+    todo en una carrera para recibir 100 gratis en la siguiente antes de
+    saber si ha ganado.
+  - Cada cambio de puntos queda guardado como un movimiento con su motivo
+    (minimo, apuesta, cobro, anulacion o correccion), y los puntos de cada
+    usuario son siempre la suma de sus movimientos. Nadie cambia puntos a
+    mano, ni el admin.
+
+3.5 Comodin
+
+  - Cada usuario tiene un comodin por temporada y lo activa en una jugada.
+  - En esa carrera, las apuestas acertadas cobran el doble de lo normal: x4
+    en vez de x2, y x6 en vez de x3 si hay plus de podio. Las falladas se
+    pierden igual que siempre.
+  - Una vez activado, no se puede quitar ni pasar a otra carrera, y la
+    jugada que lo lleva no se puede borrar; solo se pueden cambiar sus
+    apuestas hasta el cierre. Antes de activarlo, la web pide confirmacion.
+  - Si la carrera se cancela, se devuelve.
+  - Puede decidir la temporada: apostar mucho con comodin y acertar da
+    muchisimos puntos, y fallar deja sin comodin. Es parte del juego.
+
+3.6 Fases de cada carrera
+
+  - Pendiente: la carrera anterior todavia no tiene resultado. No se puede
+    jugar.
+  - Abierta: desde que la anterior tiene resultado (o desde el principio, si
+    es la primera de la temporada) hasta el inicio de la qualy. Cada usuario
+    puede crear, cambiar o borrar su jugada. Solo ve la suya; de los demas
+    solo ve cuantos han jugado (por ejemplo, "12 usuarios han jugado").
+  - Cerrada: desde el inicio de la qualy hasta que hay resultado. Ya no se
+    puede cambiar nada. Se aplica el minimo de 100 y se descuenta lo
+    apostado. Las jugadas de los demas siguen ocultas.
+  - Finalizada: el admin ha publicado el resultado. Se pagan las apuestas
+    acertadas, se ven las jugadas de todos, se actualiza la clasificacion y
+    se abre la siguiente carrera.
+  - Cancelada: el admin puede cancelar una carrera en cualquier momento,
+    incluso con la qualy ya disputada. Se anula todo lo de esa carrera: se
+    devuelve lo apostado, se deshacen el minimo de 100 y los cobros, y se
+    devuelve el comodin.
+
+  El cierre es al inicio de la qualy y no a la salida de la carrera porque la
+  pole se decide en la qualy: si se cerrara el domingo, se podria apostar a
+  la pole sabiendola ya. Si la qualy se retrasa, el cierre se mantiene a la
+  hora prevista.
+
+  Importante: estas reglas las aplica el servidor, no la interfaz. Si un
+  usuario pide las jugadas de una carrera sin resultado, la API solo le
+  devuelve la suya, aunque la peticion no venga de la web.
+
+  Las paginas de carrera y de clasificacion hacen polling (por ejemplo, cada
+  20 segundos) para pasar solas de una fase a otra y mostrar los cambios.
+
+3.7 Ejemplos
+
+  Ana tiene 120 puntos. Apuesta 50 a Leclerc en la pole y 30 a Russell
+  tercero.
+    - Al cerrar se le descuentan 80 y se queda con 40.
+    - Leclerc hace la pole y Russell acaba cuarto: cobra 100 por la pole y
+      nada por el tercero.
+    - Termina con 140: ha ganado 20 en esa carrera.
+
+  Bea tiene 40 puntos. Como tiene menos de 100, puede apostar hasta 100, y
+  apuesta 100 al ganador.
+    - Al cerrar se le suben los puntos a 100 y se le descuentan los 100
+      apostados: se queda con 0.
+    - Si acierta, cobra 200 y termina con 200. Si falla, sigue con 0, y en su
+      siguiente jugada vuelve a poder apostar 100.
+
+  Carlos tiene 300 puntos. Activa el comodin y apuesta 20 a primero, 20 a
+  segundo y 20 a tercero.
+    - Al cerrar se le descuentan 60 y se queda con 240.
+    - Acierta el podio exacto: por el plus, cada apuesta cobraria x3, y con
+      el comodin cobra x6. Cobra 3 x 120 = 360 y termina con 600.
+
+3.8 Clasificacion
+
+  - Una por temporada, ordenada por puntos. Se pueden consultar las de
+    temporadas anteriores.
+  - Empates: comparten posicion y el siguiente salta puestos (1, 2, 2, 4).
+    Dentro de un empate se ordena por nombre de usuario.
+
+3.9 Grupos privados (fase 2)
+
+  - Cualquier usuario puede crear un grupo y compartir un codigo o enlace de
+    invitacion para que otros se unan.
+  - Se puede estar en varios grupos.
+  - Solo los miembros ven el grupo y su clasificacion.
+  - El creador puede expulsar miembros, regenerar el codigo y borrar el
+    grupo. No puede salir del grupo sin borrarlo.
+  - Los grupos no cambian el juego: la clasificacion de un grupo son los
+    mismos puntos de la general, mostrando solo a sus miembros.
+
+3.10 Recuperacion de contraseña (fase 2)
+
+  - El usuario indica su email y recibe un enlace para poner una contraseña
+    nueva.
+  - El enlace lleva un token aleatorio, de un solo uso, que caduca (por
+    ejemplo, en una hora) y que se guarda como hash.
+  - La respuesta es la misma exista o no el email, para no revelar que
+    cuentas hay.
+  - En local se usa Mailpit, un servidor de correo de pruebas en Docker que
+    muestra los correos sin enviarlos de verdad. En las pruebas automaticas
+    se usa un envio simulado que guarda el enlace para poder usarlo.
+
+
+4. REGLAS DE NEGOCIO Y CASOS LIMITE
+--------------------------------------------------------------------------------
+
+Jugadas y apuestas:
+  - Una jugada por usuario y carrera, con una apuesta como maximo por
+    categoria y al menos una.
+  - Cada apuesta: minimo 10 puntos, numero entero.
+  - Solo se juega la carrera abierta. Crear, cambiar o borrar una jugada de
+    una carrera pendiente, cerrada, finalizada o cancelada da error. A la
+    hora exacta del cierre ya cuenta como cerrada.
+  - Podio sin pilotos repetidos.
+  - Solo pilotos inscritos y activos en la temporada.
+  - El total apostado no puede pasar de los puntos disponibles: los que
+    tengas, o 100 si tienes menos.
+  - Si una apuesta de la jugada no es valida, se rechaza la jugada entera y
+    no se guarda nada.
+
+Comodin:
+  - Uno por temporada; intentar usar un segundo da error.
+  - No se puede quitar de la jugada ni borrar la jugada que lo lleva.
+  - Se devuelve si la carrera se cancela.
+
+Cierre:
+  - El cierre es la hora de inicio de la qualy. Si la qualy se retrasa, el
+    cierre no cambia.
+  - El admin puede cambiar la hora de cierre de una carrera pendiente o
+    abierta (por un cambio de horario o un error), pero una carrera cerrada
+    no se reabre.
+  - Al cerrar, a quien ha jugado y tiene menos de 100 puntos se le suben a
+    100, y despues se descuenta lo apostado. Se hace una sola vez por
+    carrera.
+
+Resultados y pagos:
+  - Solo se puede publicar el resultado de una carrera cerrada.
+  - El resultado tiene pole, primero, segundo, tercero y vuelta rapida, con
+    pilotos inscritos en la temporada y el podio sin repetidos.
+  - Al publicarlo se pagan las apuestas acertadas: x2, x3 las del podio si
+    se aciertan los tres, y el doble con comodin.
+  - Publicar dos veces el mismo resultado no paga dos veces.
+  - Si se corrige un resultado (por ejemplo, por una descalificacion), se
+    deshacen los cobros anteriores y se calculan de nuevo. Si por eso alguien
+    se queda en negativo, en su siguiente jugada el minimo de 100 le vuelve
+    a subir.
+
+Cancelacion y borrado:
+  - Al cancelar una carrera se anula todo lo suyo: lo apostado se devuelve,
+    el minimo de 100 y los cobros se deshacen y el comodin se devuelve.
+  - Una carrera con jugadas no se puede borrar, solo cancelar.
+  - Un piloto con apuestas o resultados no se puede borrar, solo marcar
+    como inactivo.
+
+Puntos:
+  - Todo cambio de puntos es un movimiento con su motivo, y los puntos son
+    siempre la suma de los movimientos. Nadie, ni el admin, los cambia a
+    mano.
+
+Tras cualquier operacion rechazada, los datos tienen que quedar exactamente
+como estaban.
+
+
+5. PERMISOS
+--------------------------------------------------------------------------------
+
+Todos se comprueban en el servidor; ocultar botones en la interfaz no basta.
+
+  1. Autenticacion: sin sesion solo se puede ver la portada, registrarse e
+     iniciar sesion. Todo lo demas responde 401.
+  2. Propiedad: una jugada solo la puede cambiar o borrar su autor.
+     Cualquier otro usuario recibe 403.
+  3. Rol de administrador: solo el admin gestiona temporadas, pilotos,
+     carreras y resultados; un usuario normal recibe 403. A su vez, el admin
+     no puede jugar: si intenta hacer una jugada, recibe 403.
+  4. Visibilidad por resultado: las jugadas de otros no se pueden consultar
+     hasta que su carrera tiene resultado. Antes, el listado solo trae la
+     tuya, y pedir una ajena por su id da 404.
+
+  En la fase 2 se añaden dos mas:
+  5. Miembro de grupo: si no eres miembro, el grupo y su clasificacion no
+     existen para ti (404).
+  6. Creador de grupo: solo el creador expulsa, regenera el codigo o borra el
+     grupo. Otro miembro recibe 403.
+
+
+6. MODELO DE DATOS
+--------------------------------------------------------------------------------
+
+Fase 1:
+
+  USUARIO      id, nombre de usuario (unico), email (unico), contraseña
+               (hash), rol (usuario o admin), piloto favorito, fecha de alta.
+  TEMPORADA    id, año, nombre (por ejemplo, "Formula 1 2026").
+  PILOTO       id, nombre, nacionalidad.
+  INSCRIPCION  temporada, piloto, equipo, dorsal, activo (si/no). Un piloto
+               se inscribe una sola vez por temporada y el dorsal no se
+               repite dentro de la temporada.
+  CARRERA      id, temporada, ronda, nombre del Gran Premio, circuito, inicio
+               de la qualy (cierre), salida de la carrera, cancelada (si/no),
+               cierre procesado (si/no).
+  RESULTADO    carrera, pole, primero, segundo, tercero, vuelta rapida, fecha
+               de publicacion. Uno por carrera.
+  JUGADA       id, usuario, carrera, comodin (si/no), fecha de creacion y de
+               ultima modificacion. Una por usuario y carrera.
+  APUESTA      id, jugada, categoria (pole, primero, segundo, tercero o
+               vuelta rapida), piloto, puntos apostados, estado (pendiente,
+               acertada o fallada). Una por jugada y categoria.
+  MOVIMIENTO   id, usuario, temporada, tipo (minimo, apuesta, cobro,
+               anulacion o correccion), puntos (positivos o negativos),
+               carrera, apuesta (si corresponde), fecha.
+
+Fase 2:
+
+  GRUPO        id, nombre, codigo de invitacion (unico), creador, fecha.
+  MIEMBRO      grupo, usuario, fecha de union. Uno por grupo y usuario.
+  RECUPERACION id, usuario, hash del token, caducidad, usado (si/no).
+
+Relaciones principales:
+  - Una temporada tiene muchas carreras y muchos pilotos inscritos.
+  - Una carrera tiene como mucho un resultado y muchas jugadas.
+  - Una jugada es de un usuario y una carrera, y tiene de una a cinco
+    apuestas.
+  - Apuestas y resultados apuntan a pilotos inscritos en la temporada de su
+    carrera.
+  - Los movimientos de un usuario en una temporada suman sus puntos.
+  - En la fase 2, un grupo tiene muchos miembros y un usuario puede estar en
+    muchos grupos.
+
+
+7. FLUJO PRINCIPAL Y VIDEO
+--------------------------------------------------------------------------------
+
+  1. Ana se registra e inicia sesion.
+  2. Ve la proxima carrera abierta, cuanto falta para el cierre y sus puntos
+     disponibles.
+  3. Hace su jugada: elige categorias, pilotos y puntos y, si quiere, activa
+     el comodin.
+  4. Puede cambiarla hasta el cierre. Ve cuantos usuarios han jugado, pero
+     no a que.
+  5. Al empezar la qualy se cierran las apuestas: se aplica el minimo de 100
+     y la clasificacion descuenta lo apostado.
+  6. Tras la carrera, el admin publica el resultado.
+  7. Se pagan las apuestas acertadas, se ven las jugadas de todos, se
+     actualiza la clasificacion y se abre la siguiente carrera.
+
+Para el video: este recorrido completo, mas algun error bien tratado
+(cambiar la jugada despues del cierre, una apuesta de menos de 10 puntos,
+apostar mas de lo disponible o repetir piloto en el podio). Para grabarlo
+sin esperar a una carrera real, se crea una carrera de prueba con el cierre
+a los pocos minutos.
+
+
+8. ACCESIBILIDAD, MOVIL Y EXPERIENCIA DE USO
+--------------------------------------------------------------------------------
+
+Referencia: WCAG 2.2 nivel AA, como recomienda el PDF.
+
+  - HTML semantico, idioma de la pagina en español y encabezados ordenados.
+  - Formulario de jugada con etiqueta en cada campo (categoria, piloto y
+    puntos), con los puntos disponibles y el total apostado siempre a la
+    vista y los errores junto al campo que falla.
+  - Todo usable con teclado, con foco visible y en un orden logico.
+  - Los cambios importantes (jugada guardada, error, carrera cerrada,
+    resultado publicado) se anuncian tambien a lectores de pantalla
+    (regiones aria-live). La cuenta atras no se anuncia cada segundo, solo en
+    momentos clave.
+  - Aciertos y fallos con icono y texto, no solo con verde y rojo.
+  - Contraste suficiente entre texto y fondo.
+  - La clasificacion es una tabla en escritorio, y en movil se adapta (menos
+    columnas o tarjetas) sin desplazamiento horizontal de la pagina.
+  - Botones con tamaño y separacion comodos para usar con el dedo.
+  - Confirmacion antes de las acciones dificiles de deshacer: activar el
+    comodin, borrar una jugada, publicar o corregir un resultado y cancelar
+    una carrera.
+  - Estados vacios explicitos ("Todavia no has jugado esta carrera", "No hay
+    ninguna carrera abierta"), indicador de carga en las peticiones y
+    mensajes de exito y de error visibles. La interfaz no da por hecho que
+    las peticiones salen bien.
+  - Se revisa con teclado, con una herramienta automatica (Lighthouse o axe)
+    y en vista de escritorio y de movil.
+
+
+9. LOGS
+--------------------------------------------------------------------------------
+
+El servidor registrara lo que pasa con una libreria de logging, no con
+console.log o similares.
+
+Libreria: depende de la tecnologia que se elija (ver decisiones pendientes).
+Con Node, pino, junto con pino-http para registrar cada peticion; la
+alternativa mas conocida es winston. Con PHP, Monolog.
+
+Que se registra:
+  - Cada peticion HTTP: metodo, ruta, codigo de respuesta, duracion, un id de
+    peticion (para seguir todo lo que pasa en una misma peticion) y el id
+    del usuario si hay sesion.
+  - Eventos importantes: registro, inicio de sesion (correcto y fallido),
+    jugada creada, cambiada o borrada, comodin activado, cierre procesado
+    (jugadas, minimos aplicados y total descontado), resultado publicado o
+    corregido (apuestas acertadas y total pagado), carrera cancelada y
+    cambios del admin en temporadas, pilotos y carreras.
+  - Errores no controlados, con su traza.
+
+Niveles:
+  error   fallos del servidor (respuestas 5xx, errores de base de datos)
+  warn    peticiones rechazadas (4xx) e inicios de sesion fallidos
+  info    eventos importantes y peticiones correctas
+  debug   detalle extra para desarrollo, desactivado normalmente
+El nivel se elige con una variable del .env (por ejemplo, LOG_LEVEL).
+
+Formato y salida:
+  - JSON, una linea por evento, con fecha, nivel y mensaje. En desarrollo se
+    puede ver en formato legible (con pino, usando pino-pretty).
+  - Se escriben en la salida estandar; con Docker se consultan con
+    docker compose logs.
+
+Nunca se registran contraseñas, hashes, cookies de sesion ni tokens. A los
+usuarios se les identifica por su id.
+
+En las pruebas se baja el nivel (por ejemplo, solo errores) para no ensuciar
+la salida.
+
+Los logs no sustituyen a los movimientos: los puntos se calculan siempre con
+la tabla de movimientos. Los logs sirven para depurar y para saber que ha
+pasado y cuando.
+
+
+10. PRUEBAS AUTOMATIZADAS
+--------------------------------------------------------------------------------
+
+Pruebas de API: peticiones HTTP al servidor comprobando el codigo de
+respuesta, lo que devuelve y como quedan los datos.
+
+Condiciones que pide el PDF:
+  - Se lanzan con un unico comando (por ejemplo, npm test), documentado en el
+    README.
+  - Base de datos de pruebas aparte, nunca la de desarrollo.
+  - Cada prueba prepara sus propios datos y no depende del orden.
+  - Tras cada caso de error se comprueba que los datos no han cambiado.
+Ademas, la hora del servidor se puede fijar en las pruebas (ver notas
+tecnicas) para probar el cierre sin esperar.
+
+Casos minimos:
+
+  Autenticacion
+    - Crear, cambiar o borrar una jugada sin sesion: 401 y no cambia nada.
+
+  Autorizacion (un caso por cada tipo de permiso)
+    - B intenta cambiar o borrar la jugada de A: 403 y la de A sigue igual.
+    - Un usuario normal intenta crear una carrera o publicar un resultado:
+      403.
+    - El admin intenta hacer una jugada: 403.
+    - Sin resultado, B pide las jugadas de la carrera y solo recibe la suya;
+      si pide la de A por su id, 404. Con el resultado publicado, las ve
+      todas.
+    - Fase 2: un no miembro pide un grupo: 404. Un miembro que no es el
+      creador intenta expulsar a otro: 403.
+
+  CRUD
+    - Crear, consultar, cambiar y borrar una jugada antes del cierre,
+      comprobando la base de datos en cada paso.
+    - Crear, consultar, cambiar y borrar temporadas, pilotos y carreras como
+      admin.
+
+  Validacion (400)
+    - Apuesta de menos de 10 puntos, negativa o con decimales.
+    - Jugada sin ninguna apuesta, o con dos apuestas a la misma categoria.
+    - El mismo piloto en dos puestos del podio.
+    - Piloto no inscrito o inactivo.
+    - Si una apuesta de la jugada no es valida, no se guarda ninguna.
+
+  Reglas de negocio y casos limite
+    - Jugada un segundo antes del cierre: se acepta. A la hora exacta: 409.
+    - Jugar una carrera pendiente (con la anterior sin resultado): 409.
+    - Apostar en total mas de los puntos disponibles: 409 y nada cambia.
+    - Un usuario con 40 puntos puede apostar 100, y al cerrar se le suben a
+      100 y se le descuenta lo apostado. Uno con 150 no puede apostar 160.
+    - El cierre se procesa una sola vez aunque lleguen varias peticiones a la
+      vez.
+    - Hasta el cierre, apostar no cambia la clasificacion; despues del
+      cierre, refleja lo descontado.
+    - Pagos: la acertada cobra x2, la fallada nada, el podio exacto x3 y con
+      comodin el doble.
+    - Segundo comodin en la temporada: 409. Quitar el comodin o borrar la
+      jugada que lo lleva: 409.
+    - Cancelar una carrera devuelve lo apostado, deshace el minimo y los
+      cobros y devuelve el comodin.
+    - Corregir un resultado rehace los cobros. Publicar o corregir dos veces
+      no paga doble.
+    - Los puntos de cada usuario coinciden con la suma de sus movimientos.
+    - Dos peticiones a la vez que juntas superarian los puntos disponibles:
+      solo se acepta una.
+    - Borrar un piloto con apuestas o una carrera con jugadas: 409 y siguen
+      ahi.
+
+  Flujo principal
+    - Dos usuarios juegan, llega el cierre y se descuenta lo apostado, el
+      admin publica el resultado, se pagan las acertadas, la clasificacion
+      queda como debe y se abre la siguiente carrera.
+
+
+11. NOTAS TECNICAS
+--------------------------------------------------------------------------------
+
+  - Sin procesos programados. El servidor calcula la fase de cada carrera
+    en cada peticion a partir de la hora actual, de si la carrera anterior
+    tiene resultado y de si esta cancelada.
+  - Cierre al vuelo: el minimo de 100 y el descuento de lo apostado se
+    aplican en la primera peticion que llega despues de la hora de cierre,
+    sea cual sea (incluida la de publicar el resultado), antes de
+    atenderla. Se hace en una transaccion que marca la carrera como
+    procesada, para que no se repita aunque lleguen dos peticiones a la vez.
+    Desde fuera es como si se hubiera hecho justo a la hora del cierre.
+  - Reloj inyectable: el servidor obtiene la hora actual de una unica funcion
+    que en las pruebas se puede fijar. Asi se prueba "un segundo antes" y "a
+    la hora exacta" sin esperar.
+  - Horas guardadas en UTC y mostradas en hora española. Un fallo aqui es
+    cerrar una hora antes o despues.
+  - Polling en vez de WebSockets: las paginas de carrera y clasificacion
+    preguntan al servidor cada pocos segundos si hay cambios.
+  - Operaciones atomicas: guardar una jugada, procesar un cierre, pagar un
+    resultado o cancelar una carrera se hacen dentro de una transaccion. Si
+    algo falla, no se guarda nada.
+  - Pagos idempotentes: repetir un pago no cambia nada. Corregir un
+    resultado es deshacer los cobros anteriores con movimientos de
+    correccion y hacer los nuevos.
+  - Datos iniciales con un seed: temporada, pilotos, carreras (las pasadas
+    con su resultado) y un admin de prueba. Las credenciales de prueba van
+    en el README, nunca contraseñas reales.
+  - Secretos (la clave de sesion, las credenciales de la base de datos y, en
+    la fase 2, las del correo) en un .env fuera del repositorio, con un
+    .env.example de plantilla.
+  - Codigos de respuesta comunes para todo el equipo:
+      400  datos invalidos o incompletos
+      401  sin sesion
+      403  sin permiso
+      404  no existe o no se puede ver
+      409  no permitido en el estado actual (carrera no abierta, comodin ya
+           usado, puntos insuficientes, borrar algo con datos relacionados)
+
+
+12. FASES DE DESARROLLO
+--------------------------------------------------------------------------------
+
+Fase 1. Version minima (prioridad)
+  - Registro, inicio de sesion y perfil.
+  - Gestion de temporadas, pilotos, carreras y resultados por el admin.
+  - Jugadas y apuestas, con cierre a la hora de la qualy.
+  - Puntos, minimo de 100, pagos, comodin y clasificacion.
+  - Cancelacion de carreras y correccion de resultados.
+  - Validacion en cliente y servidor, y errores claros.
+  - Logs.
+  - Accesibilidad y diseño adaptable.
+  - Pruebas de API de todo lo anterior.
+  - README con instrucciones de instalacion y ejecucion y una descripcion
+    breve de la arquitectura.
+  Con esto la practica ya cumple todos los requisitos del PDF.
+
+Fase 2
+  - Grupos privados con su clasificacion.
+  - Recuperacion de contraseña por correo.
+  - Pruebas de sus permisos y reglas.
+  Se construye encima de la fase 1 sin cambiar nada de lo anterior.
+
+
+13. DECISIONES PENDIENTES
+--------------------------------------------------------------------------------
+
+  - Tecnologias: lenguaje y framework del servidor, y base de datos. El PDF
+    solo obliga a usar JavaScript (sin WebAssembly) y HTTP sin WebSockets, a
+    que la aplicacion se pueda ejecutar de forma reproducible y a que el
+    servidor se pueda probar por HTTP. De esto depende tambien la libreria
+    de logs.
+  - Tamaño del equipo, reparto del trabajo y fechas de entrega. El PDF dice
+    que los plazos se comunicaran mas adelante.
+  - Si la aplicacion se ejecuta solo en local (con Docker Compose) o tambien
+    se publica en Internet. En principio basta con local; depende de como
+    quede la evaluacion, por ejemplo si otros alumnos tienen que usarla en
+    una auditoria.
+  - Multiplicadores definitivos. De momento todo paga x2; el x3 del plus de
+    podio y que el comodin duplique lo cobrado son una propuesta.
+  - Si hay un tope de puntos apostados por carrera (se propuso 300).
+  - Si los resultados seran los reales de la temporada o inventados. De
+    momento no cambia nada, porque el multiplicador no depende del piloto.
+  - Si es obligatorio jugar todas las carreras y que pasa con quien no juega.
+    Ahora mismo, quien no juega una carrera no gana ni pierde nada.
+  - Correccion de resultados: la propuesta es rehacer los cobros, como se
+    decidio al principio. La alternativa es que los pagos sean definitivos
+    al publicar el resultado, como hacen algunas casas de apuestas.
+  - Nombre definitivo.
