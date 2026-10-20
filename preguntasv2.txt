@@ -111,7 +111,7 @@ Si. Podra modificar esos datos (la contraseña, pidiendo la actual) y tambien ha
 
 **26. ¿Con cuantos puntos se empieza y cuanto se podra apostar por carrera?**
 
-Cada usuario empieza la temporada con 1.000 puntos. En cada apuesta hay que poner como minimo 10 puntos, y sumando todas las apuestas de una carrera se puede apostar como maximo un 20% de tus puntos, redondeando hacia abajo (propuesta, lo del redondeo). El 20% sustituye al tope de 300 que habia antes. Por ejemplo, con 1.000 puntos puedes apostar hasta 200, y con 137, hasta 27.
+Cada usuario empieza la temporada con 1.000 puntos. En cada apuesta hay que poner como minimo 10 puntos. No hay tope por carrera: sumando todas las apuestas se puede apostar hasta el total de tus puntos, o hasta 100 si tienes menos (35). Por ejemplo, con 1.000 puntos puedes apostarlos todos en una carrera.
 
 **27. ¿El saldo de apuestas sera independiente de los puntos de la clasificacion?**
 
@@ -147,7 +147,7 @@ Pendiente. Propuesta: en local con Docker Compose, que es lo que pide el PDF. Si
 
 **35. ¿Que pasa si te quedas sin puntos o con muy pocos?**
 
-Si te quedas con 100 puntos o menos, en la siguiente carrera tienes 100 como minimo, asi que con el 20% puedes apostar hasta 20. Crea puntos de la nada a proposito, para que nadie se quede sin poder jugar. Se aplica al cerrar las apuestas y solo a quien ha jugado esa carrera, para que nadie lo cobre haciendo una jugada y borrandola despues (propuesta).
+Si te quedas con 100 puntos o menos, en la siguiente carrera puedes apostar 100 igualmente. Crea puntos de la nada a proposito, para que nadie se quede sin poder jugar y siempre se pueda remontar. Se aplica al cerrar las apuestas y solo a quien ha jugado esa carrera: en ese momento se le suben los puntos a 100 y despues se descuenta lo apostado. Asi nadie lo cobra haciendo una jugada y borrandola despues (propuesta).
 
 **36. ¿Cuando se descuenta lo apostado?**
 
@@ -155,7 +155,7 @@ Al cerrarse las apuestas, antes de que este el resultado. Hasta el cierre, la cl
 
 **37. ¿Cuando se puede jugar una carrera?**
 
-Solo la proxima, desde que la anterior tiene resultado (o se cancela) hasta su cierre. Asi nadie tiene apuestas en dos carreras a la vez, y el 20% y el minimo de 100 se calculan siempre con los puntos ya pagados (propuesta).
+Solo la proxima, desde que la anterior tiene resultado (o se cancela) hasta su cierre. Si no, alguien podria apostarlo todo en una carrera, quedarse a 0 y apostar los 100 del minimo en la siguiente antes de saber si ha ganado la primera (propuesta).
 
 **38. ¿Es obligatorio jugar todas las carreras?**
 
@@ -165,7 +165,7 @@ Pendiente. Ahora mismo, quien no juega una carrera no gana ni pierde nada en ell
 
 Pendiente. Se ha planteado que, si te quedas sin puntos, puedas ver un anuncio en vez de esperar al minimo de la siguiente carrera. Hay que tener en cuenta:
 
-- Con el maximo del 20% nunca llegas a 0 apostando: como mucho bajas de 100, y entonces ya tienes el minimo en la siguiente carrera.
+- Si lo apuestas todo y fallas te quedas a 0, pero en la siguiente carrera ya puedes apostar los 100 del minimo (35).
 - Como solo se puede jugar la proxima carrera (37), conseguir el minimo antes viendo un anuncio no te deja hacer nada que no pudieras hacer esperando. Para que sirva, el anuncio tendria que dar puntos extra.
 - Los anuncios serian simulados: una pantalla propia con una cuenta atras. Meter anuncios reales obliga a publicar la web y darla de alta en una red de anuncios.
 - Si se hace, el servidor tiene que controlarlo: que no se cobre dos veces en la misma carrera, ni antes de que acabe la cuenta atras, ni teniendo puntos de sobra.
