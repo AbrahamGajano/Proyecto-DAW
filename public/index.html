@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PorraGP · Inicio</title>
+  <link rel="stylesheet" href="/css/auth.css">
+  <script type="module" src="/js/inicio.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Ir al contenido</a>
+  <header><a class="marca" href="/">PorraGP <span>Tu próxima apuesta empieza aquí</span></a></header>
+  <main id="contenido" class="tarjeta">
+    <p class="etiqueta">Fórmula 1 · Puntos ficticios</p>
+    <h1>Una carrera. Tus favoritos.</h1>
+    <p>Regístrate para participar en la porra con puntos ficticios, sin dinero real.</p>
+    <p id="estado" role="status">Comprobando tu sesión…</p>
+    <div id="visitante" hidden>
+      <a class="boton" href="/registro.html">Crear cuenta</a>
+      <a class="enlace-secundario" href="/login.html">Ya tengo cuenta</a>
+    </div>
+    <section id="sesion" hidden aria-labelledby="titulo-sesion">
+      <h2 id="titulo-sesion">Tu sesión</h2>
+      <p id="bienvenida"></p>
+      <button id="salir" type="button">Cerrar sesión</button>
+    </section>
+    <button id="reintentar" type="button" hidden>Volver a comprobar</button>
+  </main>
+  <footer>PorraGP · Proyecto DAW</footer>
+</body>
+</html>

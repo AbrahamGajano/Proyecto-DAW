@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iniciar sesión · PorraGP</title>
+  <link rel="stylesheet" href="/css/auth.css">
+  <script type="module" src="/js/form-auth.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Ir al contenido</a>
+  <header><a class="marca" href="/">PorraGP <span>Tu próxima apuesta empieza aquí</span></a></header>
+  <main id="contenido" class="tarjeta">
+    <p class="etiqueta">De vuelta al circuito</p>
+    <h1>Inicia sesión</h1>
+    <p>Accede con el email y la contraseña de tu cuenta.</p>
+    <form id="form-auth" data-modo="login" action="/api/auth/login" method="post" novalidate>
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required maxlength="254" aria-describedby="error-email">
+      <p class="error-campo" id="error-email"></p>
+      <label for="contrasena">Contraseña</label>
+      <input id="contrasena" name="contrasena" type="password" autocomplete="current-password" required maxlength="128" aria-describedby="error-contrasena">
+      <p class="error-campo" id="error-contrasena"></p>
+      <p id="estado" role="status" aria-atomic="true"></p>
+      <button type="submit">Iniciar sesión</button>
+    </form>
+    <p>¿Todavía no tienes cuenta? <a href="/registro.html">Regístrate</a>.</p>
+    <noscript>Activa JavaScript para usar este formulario.</noscript>
+  </main>
+  <footer>PorraGP · Solo puntos ficticios</footer>
+</body>
+</html>

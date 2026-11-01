@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crear cuenta · PorraGP</title>
+  <link rel="stylesheet" href="/css/auth.css">
+  <script type="module" src="/js/form-auth.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Ir al contenido</a>
+  <header><a class="marca" href="/">PorraGP <span>Tu próxima apuesta empieza aquí</span></a></header>
+  <main id="contenido" class="tarjeta">
+    <p class="etiqueta">Entra en la parrilla</p>
+    <h1>Crea tu cuenta</h1>
+    <p>Elige el nombre con el que te verá el resto de participantes.</p>
+    <form id="form-auth" data-modo="registro" action="/api/auth/registro" method="post" novalidate>
+      <label for="nombreUsuario">Nombre de usuario</label>
+      <input id="nombreUsuario" name="nombreUsuario" autocomplete="username" required maxlength="50" aria-describedby="error-nombreUsuario">
+      <p class="error-campo" id="error-nombreUsuario"></p>
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" required maxlength="254" aria-describedby="error-email">
+      <p class="error-campo" id="error-email"></p>
+      <label for="contrasena">Contraseña</label>
+      <input id="contrasena" name="contrasena" type="password" autocomplete="new-password" required minlength="8" maxlength="128" aria-describedby="ayuda-contrasena error-contrasena">
+      <p class="ayuda" id="ayuda-contrasena">Entre 8 y 128 caracteres. Puedes usar una frase.</p>
+      <p class="error-campo" id="error-contrasena"></p>
+      <p id="estado" role="status" aria-atomic="true"></p>
+      <button type="submit">Crear cuenta</button>
+    </form>
+    <p>¿Ya tienes cuenta? <a href="/login.html">Inicia sesión</a>.</p>
+    <noscript>Activa JavaScript para usar este formulario.</noscript>
+  </main>
+  <footer>PorraGP · Solo puntos ficticios</footer>
+</body>
+</html>
