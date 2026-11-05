@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node --env-file=.env server/index.js",
     "dev": "node --watch --env-file=.env server/index.js",
-    "test": "vitest run tests/auth.test.js",
+    "test": "vitest run tests/auth.test.js tests/fases.test.js",
     "test:ui": "vitest run tests/browser.test.js",
     "db:init": "node --env-file=.env server/init-db.js"
   },
